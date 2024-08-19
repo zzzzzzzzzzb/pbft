@@ -1,0 +1,17 @@
+[package]
+name = "consensus"
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tonic.workspace = true
+tonic-build.workspace = true
+tokio.workspace = true
+prost.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

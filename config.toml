@@ -1,0 +1,17 @@
+[server]
+listen_addr = "0.0.0.0:8080"
+
+[log]
+level = "debug"
+
+[node]
+id = 1
+is_leader = true
+
+[node.members]
+"1" = "http://127.0.0.1:8080"
+"2" = "http://127.0.0.1:8081"
+"3" = "http://127.0.0.1:8082"
+"4" = "http://127.0.0.1:8083"
+
+

@@ -1,0 +1,18 @@
+[package]
+name = "pbft"
+edition.workspace = true
+version.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+
+[dependencies]
+consensus.workspace = true
+config.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+
+#[[bin]]
+#name = "pbft"
+#path = "src/main.rs"
