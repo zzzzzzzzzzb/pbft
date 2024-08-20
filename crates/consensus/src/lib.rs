@@ -1,16 +1,17 @@
+mod client;
 pub mod error;
-pub mod server;
+mod event;
 mod message;
 mod pool;
-mod client;
-mod event;
+pub mod server;
 
 #[cfg(test)]
 mod tests {
+    use crate::{
+        client::send,
+        message::{message::Payload, Message, Request},
+    };
     use std::env;
-    use crate::client::send;
-    use crate::message::{Message, Request};
-    use crate::message::message::Payload;
 
     #[test]
     fn build_proto() {
@@ -25,7 +26,7 @@ mod tests {
             seq: 3,
             id: 0,
             digest: "".to_string(),
-            payload: Some(Payload::Request(Request{
+            payload: Some(Payload::Request(Request {
                 payload: Vec::new(),
             })),
         };

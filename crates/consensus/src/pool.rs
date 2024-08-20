@@ -1,12 +1,15 @@
-use std::collections::{HashMap, hash_map};
-use std::sync::Arc;
+use crate::message::{message::Payload, Commit, Message, PrePrepare, Prepare};
+use std::{
+    collections::{hash_map, HashMap},
+    sync::Arc,
+};
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    Mutex,
+};
 use tracing::{debug, error, info, warn};
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::sync::Mutex;
-use crate::message::{Commit, Message, PrePrepare, Prepare};
-use crate::message::message::Payload;
 
-struct SeqMessage{
+struct SeqMessage {
     pre_prepare: HashMap<usize, PrePrepare>,
     prepare: HashMap<usize, Prepare>,
     commit: HashMap<usize, Commit>,
@@ -33,7 +36,14 @@ pub struct RequestHandler {
 }
 
 impl RequestHandler {
-    pub fn new(id: usize, is_leader: bool, id_list: HashMap<usize, String>, receiver: Receiver<Message>, capacity: usize, sender: Sender<Message>) -> Self {
+    pub fn new(
+        id: usize,
+        is_leader: bool,
+        id_list: HashMap<usize, String>,
+        receiver: Receiver<Message>,
+        capacity: usize,
+        sender: Sender<Message>,
+    ) -> Self {
         let mut b: Vec<SeqMessage> = Vec::new();
         for _ in 0..capacity {
             b.push(SeqMessage {
@@ -65,7 +75,6 @@ impl RequestHandler {
             }
         }
     }
-
 }
 
 impl Pool {
@@ -73,36 +82,57 @@ impl Pool {
         let m_view = m.view as usize;
         let m_seq = m.seq as usize;
 
-        if !self.view_seq_check(m_view, m_seq) { return; }
+        if !self.view_seq_check(m_view, m_seq) {
+            return;
+        }
 
         let index = self.index_in_queue(m_seq);
 
         match m.payload {
             Some(Payload::Request(ref request)) => {
-                debug!("[REQUEST] received request. view:{}, sequence:{}", m_view, m_seq);
+                debug!(
+                    "[REQUEST] received request. view:{}, sequence:{}",
+                    m_view, m_seq
+                );
                 if self.is_leader {
-                    info!("[REQUEST]is leader, broadcast pre-prepare message. view:{}, sequence:{}", m_view, m_seq);
-                    let pre_prepare = PrePrepare{
+                    info!(
+                        "[REQUEST]is leader, broadcast pre-prepare message. view:{}, sequence:{}",
+                        m_view, m_seq
+                    );
+                    let pre_prepare = PrePrepare {
                         payload: request.clone().payload,
                         signature: vec![],
                     };
-                    let _ = self.queue[index].pre_prepare.insert(m.id as usize, pre_prepare);
+                    let _ = self.queue[index]
+                        .pre_prepare
+                        .insert(m.id as usize, pre_prepare);
 
                     self.event(self.transfer(m.clone())).await;
                 } else {
                     debug!("not leader, do nothing");
                 }
-            },
+            }
             Some(Payload::PrePrepare(ref pre_prepare)) => {
-                debug!("[PRE-PREPARE] received pre-prepare message from node{}. view:{}, sequence:{}", m.id, m_view, m_seq);
+                debug!(
+                    "[PRE-PREPARE] received pre-prepare message from node{}. view:{}, sequence:{}",
+                    m.id, m_view, m_seq
+                );
                 if !self.is_pre_prepared(index) {
-                    let _ = self.queue[index].pre_prepare.insert(m.id as usize, pre_prepare.clone());
-                    info!("[PRE-PREPARE] view:{}, sequence:{} pre-prepared", m_view, m_seq);
+                    let _ = self.queue[index]
+                        .pre_prepare
+                        .insert(m.id as usize, pre_prepare.clone());
+                    info!(
+                        "[PRE-PREPARE] view:{}, sequence:{} pre-prepared",
+                        m_view, m_seq
+                    );
                     self.event(self.transfer(m.clone())).await;
                 }
-            },
+            }
             Some(Payload::Prepare(ref prepare)) => {
-                debug!("[PREPARE] received prepare message from node{}. view:{}, sequence:{}", m.id, m_view, m_seq);
+                debug!(
+                    "[PREPARE] received prepare message from node{}. view:{}, sequence:{}",
+                    m.id, m_view, m_seq
+                );
                 if let hash_map::Entry::Vacant(e) = self.queue[index].prepare.entry(m.id as usize) {
                     e.insert(prepare.clone());
                 }
@@ -110,9 +140,12 @@ impl Pool {
                     info!("[PREPARE] view:{}, sequence:{} prepared", m_view, m_seq);
                     self.event(self.transfer(m.clone())).await;
                 }
-            },
+            }
             Some(Payload::Commit(ref commit)) => {
-                debug!("[COMMIT] received commit message from node{}. view:{}, sequence:{}", m.id, m_view, m_seq);
+                debug!(
+                    "[COMMIT] received commit message from node{}. view:{}, sequence:{}",
+                    m.id, m_view, m_seq
+                );
                 if let hash_map::Entry::Vacant(e) = self.queue[index].commit.entry(m.id as usize) {
                     e.insert(commit.clone());
                 }
@@ -121,7 +154,9 @@ impl Pool {
                     info!("[COMMIT] view:{}, sequence:{} commited", m_view, m_seq);
                 }
             }
-            _ => { error!("no such message type"); }
+            _ => {
+                error!("no such message type");
+            }
         }
     }
 
@@ -136,13 +171,11 @@ impl Pool {
     }
 
     fn is_prepared(&self, index: usize) -> bool {
-        self.is_pre_prepared(index) &&
-            self.counts_prepare(index) >= self.bft_node_num()
+        self.is_pre_prepared(index) && self.counts_prepare(index) >= self.bft_node_num()
     }
 
     fn is_commited(&self, index: usize) -> bool {
-        self.is_prepared(index) &&
-            self.counts_commit(index) >= self.bft_node_num()
+        self.is_prepared(index) && self.counts_commit(index) >= self.bft_node_num()
     }
 
     fn counts_prepare(&self, index: usize) -> usize {
@@ -161,36 +194,30 @@ impl Pool {
     fn view_seq_check(&self, view: usize, seq: usize) -> bool {
         if seq <= self.stable_checkpoint || seq >= self.stable_checkpoint + self.capacity {
             warn!("seq <= stable_checkpoint || seq >= self.stable_checkpoint + self.capacity");
-            return false
+            return false;
         }
         if view != self.view {
             warn!("view != self.view");
-            return false
+            return false;
         }
         true
     }
 
     fn transfer(&self, m: Message) -> Message {
         let msg = match m.payload {
-            Some(Payload::Request(request)) => {
-                Some(Payload::PrePrepare(PrePrepare{
-                    payload: request.payload,
-                    signature: vec![],
-                }))
-            },
-            Some(Payload::PrePrepare(pre_prepare)) => {
-                Some(Payload::Prepare(Prepare{
-                    payload: pre_prepare.payload,
-                    signature: vec![],
-                }))
-            },
-            Some(Payload::Prepare(prepare)) => {
-                Some(Payload::Commit(Commit{
-                    payload: prepare.payload,
-                    signature: vec![],
-                }))
-            },
-            _ => {None}
+            Some(Payload::Request(request)) => Some(Payload::PrePrepare(PrePrepare {
+                payload: request.payload,
+                signature: vec![],
+            })),
+            Some(Payload::PrePrepare(pre_prepare)) => Some(Payload::Prepare(Prepare {
+                payload: pre_prepare.payload,
+                signature: vec![],
+            })),
+            Some(Payload::Prepare(prepare)) => Some(Payload::Commit(Commit {
+                payload: prepare.payload,
+                signature: vec![],
+            })),
+            _ => None,
         };
 
         Message {

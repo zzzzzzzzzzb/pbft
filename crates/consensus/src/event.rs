@@ -1,7 +1,6 @@
+use crate::{client::broadcast, message::Message};
 use std::collections::HashMap;
 use tokio::sync::mpsc::Receiver;
-use crate::client::broadcast;
-use crate::message::Message;
 
 pub struct EventHandler {
     id: usize,
@@ -24,4 +23,3 @@ impl EventHandler {
         }
     }
 }
-

@@ -76,8 +76,7 @@ pub struct MessageResponse {
 /// Generated client implementations.
 pub mod pbft_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::*;
-    use tonic::codegen::http::Uri;
+    use tonic::codegen::{http::Uri, *};
     #[derive(Debug, Clone)]
     pub struct PbftClient<T> {
         inner: tonic::client::Grpc<T>,
@@ -108,10 +107,7 @@ pub mod pbft_client {
             let inner = tonic::client::Grpc::with_origin(inner, origin);
             Self { inner }
         }
-        pub fn with_interceptor<F>(
-            inner: T,
-            interceptor: F,
-        ) -> PbftClient<InterceptedService<T, F>>
+        pub fn with_interceptor<F>(inner: T, interceptor: F) -> PbftClient<InterceptedService<T, F>>
         where
             F: tonic::service::Interceptor,
             T::ResponseBody: Default,
@@ -121,9 +117,8 @@ pub mod pbft_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<
-                http::Request<tonic::body::BoxBody>,
-            >>::Error: Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
+                Into<StdError> + Send + Sync,
         {
             PbftClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -161,23 +156,18 @@ pub mod pbft_client {
         pub async fn send_message(
             &mut self,
             request: impl tonic::IntoRequest<super::Message>,
-        ) -> std::result::Result<
-            tonic::Response<super::MessageResponse>,
-            tonic::Status,
-        > {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+        ) -> std::result::Result<tonic::Response<super::MessageResponse>, tonic::Status> {
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static("/message.Pbft/SendMessage");
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("message.Pbft", "SendMessage"));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("message.Pbft", "SendMessage"));
             self.inner.unary(req, path, codec).await
         }
     }
@@ -217,10 +207,7 @@ pub mod pbft_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(
-            inner: T,
-            interceptor: F,
-        ) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -276,21 +263,16 @@ pub mod pbft_server {
                 "/message.Pbft/SendMessage" => {
                     #[allow(non_camel_case_types)]
                     struct SendMessageSvc<T: Pbft>(pub Arc<T>);
-                    impl<T: Pbft> tonic::server::UnaryService<super::Message>
-                    for SendMessageSvc<T> {
+                    impl<T: Pbft> tonic::server::UnaryService<super::Message> for SendMessageSvc<T> {
                         type Response = super::MessageResponse;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::Message>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                <T as Pbft>::send_message(&inner, request).await
-                            };
+                            let fut =
+                                async move { <T as Pbft>::send_message(&inner, request).await };
                             Box::pin(fut)
                         }
                     }
@@ -317,18 +299,14 @@ pub mod pbft_server {
                     };
                     Box::pin(fut)
                 }
-                _ => {
-                    Box::pin(async move {
-                        Ok(
-                            http::Response::builder()
-                                .status(200)
-                                .header("grpc-status", "12")
-                                .header("content-type", "application/grpc")
-                                .body(empty_body())
-                                .unwrap(),
-                        )
-                    })
-                }
+                _ => Box::pin(async move {
+                    Ok(http::Response::builder()
+                        .status(200)
+                        .header("grpc-status", "12")
+                        .header("content-type", "application/grpc")
+                        .body(empty_body())
+                        .unwrap())
+                }),
             }
         }
     }

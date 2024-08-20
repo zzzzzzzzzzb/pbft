@@ -1,9 +1,10 @@
+use crate::{
+    error::ConsensusError,
+    message::{pbft_client::PbftClient, Message},
+};
 use std::collections::HashMap;
-use tracing::{debug, warn};
 use tonic::transport::Endpoint;
-use crate::error::ConsensusError;
-use crate::message::Message;
-use crate::message::pbft_client::PbftClient;
+use tracing::{debug, warn};
 
 pub async fn send(addr: &str, msg: Message) -> Result<(), ConsensusError> {
     let address: Endpoint = addr.parse()?;

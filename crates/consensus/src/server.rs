@@ -1,21 +1,23 @@
+use crate::{
+    error::ConsensusError,
+    event::EventHandler,
+    message::{
+        pbft_server::{Pbft, PbftServer},
+        Message, MessageResponse,
+    },
+    pool::RequestHandler,
+};
 use std::collections::HashMap;
-use tokio::sync::{mpsc};
-use tokio::sync::mpsc::{Sender};
-use tonic::Response;
-use tonic::transport::Server as TransportServer;
+use tokio::sync::{mpsc, mpsc::Sender};
+use tonic::{transport::Server as TransportServer, Response};
 use tracing::{debug, error, info};
-use crate::error::ConsensusError;
-use crate::event::EventHandler;
-use crate::message::{Message, MessageResponse};
-use crate::message::pbft_server::{Pbft, PbftServer};
-use crate::pool::{RequestHandler};
 
 pub struct Server {
     sender: Sender<Message>,
 }
 
 impl Server {
-    async fn request(&self, msg: Message) -> Result<(), ConsensusError>{
+    async fn request(&self, msg: Message) -> Result<(), ConsensusError> {
         if let Err(e) = self.sender.send(msg).await {
             error!("send request to pool err: {}", e)
         }
@@ -29,13 +31,13 @@ impl Pbft for Server {
         &self,
         request: tonic::Request<Message>,
     ) -> std::result::Result<tonic::Response<MessageResponse>, tonic::Status> {
-        match self.request(request.into_inner()).await{
+        match self.request(request.into_inner()).await {
             Ok(_) => {}
             Err(err) => {
                 let reply = MessageResponse {
                     message: err.to_string(),
                 };
-                return Ok(Response::new(reply))
+                return Ok(Response::new(reply));
             }
         };
 
@@ -45,18 +47,22 @@ impl Pbft for Server {
     }
 }
 
-pub async fn run(id: usize, is_leader: bool, id_list: HashMap<usize, String>, address: String) -> Result<(), ConsensusError> {
+pub async fn run(
+    id: usize,
+    is_leader: bool,
+    id_list: HashMap<usize, String>,
+    address: String,
+) -> Result<(), ConsensusError> {
     let addr = address.parse()?;
 
     let (tx_req, rv_req) = mpsc::channel(1024); // request
 
     let (tx_event, rv_event) = mpsc::channel(1024); // event
 
-    let server = Server {
-        sender: tx_req,
-    };
+    let server = Server { sender: tx_req };
 
-    let mut request_handler = RequestHandler::new(id, is_leader, id_list.clone(), rv_req, 10, tx_event);
+    let mut request_handler =
+        RequestHandler::new(id, is_leader, id_list.clone(), rv_req, 10, tx_event);
 
     let mut event_handler = EventHandler::new(id, id_list.clone(), rv_event);
 
@@ -72,10 +78,11 @@ pub async fn run(id: usize, is_leader: bool, id_list: HashMap<usize, String>, ad
 
     let task_server = tokio::spawn(async move {
         info!("PBFT server listening on {}...", addr);
-        if let Err(e)= TransportServer::builder()
+        if let Err(e) = TransportServer::builder()
             .add_service(PbftServer::new(server))
             .serve(addr)
-            .await {
+            .await
+        {
             error!("start pbft server err: {}", e);
         }
     });

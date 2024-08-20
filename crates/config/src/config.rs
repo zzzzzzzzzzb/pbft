@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::Read;
-use serde::Deserialize;
 use crate::error::ConfigError;
+use serde::Deserialize;
+use std::{collections::HashMap, fs::File, io::Read};
 
 #[derive(Deserialize, Debug)]
 pub struct Conf {
@@ -28,13 +26,13 @@ pub struct Node {
     pub members: HashMap<String, String>,
 }
 
-pub fn read_toml(path: String) -> Result<Conf, ConfigError>{
+pub fn read_toml(path: String) -> Result<Conf, ConfigError> {
     let mut file = File::open(path)?;
 
     let mut content = String::new();
     file.read_to_string(&mut content)?;
 
-    let toml_value:Conf = toml::from_str(&content)?;
+    let toml_value: Conf = toml::from_str(&content)?;
 
     Ok(toml_value)
 }

@@ -1,16 +1,17 @@
-use std::collections::HashMap;
-use std::str::FromStr;
-use config::config::{read_toml};
-use tracing_subscriber::{fmt};
+use config::config::read_toml;
+use std::{collections::HashMap, str::FromStr};
+use tracing_subscriber::fmt;
 
 #[tokio::main]
 async fn main() {
     let conf = match read_toml(String::from("./config.toml")) {
         Err(e) => panic!("read toml err: {}", e),
-        Ok(conf) => conf
+        Ok(conf) => conf,
     };
 
-    let id_list: HashMap<usize, String> = conf.node.members
+    let id_list: HashMap<usize, String> = conf
+        .node
+        .members
         .iter()
         // .enumerate()
         .map(|(key, value)| {
@@ -21,11 +22,16 @@ async fn main() {
 
     let level = tracing::Level::from_str(&conf.log.level).unwrap();
 
-    fmt()
-        .with_max_level(level)
-        .init();
+    fmt().with_max_level(level).init();
 
-    if let Err(err) = consensus::server::run(conf.node.id, conf.node.is_leader, id_list, conf.server.listen_addr).await {
+    if let Err(err) = consensus::server::run(
+        conf.node.id,
+        conf.node.is_leader,
+        id_list,
+        conf.server.listen_addr,
+    )
+    .await
+    {
         panic!("{}", err)
     }
 }
