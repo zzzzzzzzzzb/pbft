@@ -34,7 +34,6 @@ pub fn read_toml(path: String) -> Result<Conf, ConfigError>{
     let mut content = String::new();
     file.read_to_string(&mut content)?;
 
-    // let toml_value:Conf = serde_json::from_str(&content)?;
     let toml_value:Conf = toml::from_str(&content)?;
 
     Ok(toml_value)

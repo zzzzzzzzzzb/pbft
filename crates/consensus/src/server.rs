@@ -56,9 +56,9 @@ pub async fn run(id: usize, is_leader: bool, id_list: HashMap<usize, String>, ad
         sender: tx_req,
     };
 
-    let mut request_handler = RequestHandler::new(id.clone(), is_leader, id_list.clone(), rv_req, 10, tx_event);
+    let mut request_handler = RequestHandler::new(id, is_leader, id_list.clone(), rv_req, 10, tx_event);
 
-    let mut event_handler = EventHandler::new(id.clone(), id_list.clone(), rv_event);
+    let mut event_handler = EventHandler::new(id, id_list.clone(), rv_event);
 
     let task_req = tokio::spawn(async move {
         debug!("request handler starting...");

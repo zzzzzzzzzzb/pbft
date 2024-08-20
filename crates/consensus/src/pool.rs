@@ -62,7 +62,6 @@ impl RequestHandler {
         while let Some(message) = self.receiver.recv().await {
             if let Ok(mut lock) = self.message_pool.clone().try_lock() {
                 lock.add(message).await;
-                // break;
             }
         }
     }
@@ -83,7 +82,6 @@ impl Pool {
                 debug!("[REQUEST] received request. view:{}, sequence:{}", m_view, m_seq);
                 if self.is_leader {
                     info!("[REQUEST]is leader, broadcast pre-prepare message. view:{}, sequence:{}", m_view, m_seq);
-                    // req -> pre_prepare. store
                     let pre_prepare = PrePrepare{
                         payload: request.clone().payload,
                         signature: vec![],

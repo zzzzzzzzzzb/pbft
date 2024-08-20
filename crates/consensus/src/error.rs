@@ -19,8 +19,4 @@ pub enum ConsensusError {
     ParseAddrError(#[from] AddrParseError),
     #[error("no such message type")]
     NoSuchMessageType(),
-    #[error("ListenAddressError")]
-    ListenAddressError(),
-    #[error("mpsc err")]
-    MPSCError()
 }
