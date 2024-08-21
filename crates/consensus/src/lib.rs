@@ -23,7 +23,7 @@ mod tests {
     async fn start_client() {
         let msg = Message {
             view: 1,
-            seq: 3,
+            seq: 5,
             id: 0,
             digest: "".to_string(),
             payload: Some(Payload::Request(Request {

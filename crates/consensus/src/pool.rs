@@ -1,4 +1,6 @@
+use crate::event::{Event, EventType};
 use crate::message::{message::Payload, Commit, Message, PrePrepare, Prepare};
+use std::cmp::PartialEq;
 use std::{
     collections::{hash_map, HashMap},
     sync::Arc,
@@ -27,7 +29,7 @@ pub struct Pool {
     queue: Vec<SeqMessage>,
     start: usize,
 
-    event_sender: Sender<Message>,
+    event_sender: Sender<Event>,
 }
 
 pub struct RequestHandler {
@@ -42,7 +44,7 @@ impl RequestHandler {
         id_list: HashMap<usize, String>,
         receiver: Receiver<Message>,
         capacity: usize,
-        sender: Sender<Message>,
+        sender: Sender<Event>,
     ) -> Self {
         let mut b: Vec<SeqMessage> = Vec::new();
         for _ in 0..capacity {
@@ -59,7 +61,7 @@ impl RequestHandler {
                 is_leader,
                 id_list,
                 view: 1,
-                stable_checkpoint: 1,
+                stable_checkpoint: 0,
                 capacity,
                 queue: b,
                 start: 0,
@@ -107,7 +109,8 @@ impl Pool {
                         .pre_prepare
                         .insert(m.id as usize, pre_prepare);
 
-                    self.event(self.transfer(m.clone())).await;
+                    self.event(Event::new_broadcast(self.id as u64, m.clone()))
+                        .await;
                 } else {
                     debug!("not leader, do nothing");
                 }
@@ -125,7 +128,8 @@ impl Pool {
                         "[PRE-PREPARE] view:{}, sequence:{} pre-prepared",
                         m_view, m_seq
                     );
-                    self.event(self.transfer(m.clone())).await;
+                    self.event(Event::new_broadcast(self.id as u64, m.clone()))
+                        .await;
                 }
             }
             Some(Payload::Prepare(ref prepare)) => {
@@ -138,7 +142,8 @@ impl Pool {
                 }
                 if self.is_prepared(index) {
                     info!("[PREPARE] view:{}, sequence:{} prepared", m_view, m_seq);
-                    self.event(self.transfer(m.clone())).await;
+                    self.event(Event::new_broadcast(self.id as u64, m.clone()))
+                        .await;
                 }
             }
             Some(Payload::Commit(ref commit)) => {
@@ -150,8 +155,7 @@ impl Pool {
                     e.insert(commit.clone());
                 }
                 if self.is_commited(index) {
-                    // TODO
-                    info!("[COMMIT] view:{}, sequence:{} commited", m_view, m_seq);
+                    self.event(Event::new_commit(m.clone())).await;
                 }
             }
             _ => {
@@ -160,9 +164,9 @@ impl Pool {
         }
     }
 
-    async fn event(&self, m: Message) {
-        if let Err(e) = self.event_sender.send(m).await {
-            error!("event sender error:{}", e);
+    async fn event(&self, event: Event) {
+        if let Err(err) = self.event_sender.send(event).await {
+            error!("event sender error:{}", err);
         }
     }
 
@@ -201,31 +205,5 @@ impl Pool {
             return false;
         }
         true
-    }
-
-    fn transfer(&self, m: Message) -> Message {
-        let msg = match m.payload {
-            Some(Payload::Request(request)) => Some(Payload::PrePrepare(PrePrepare {
-                payload: request.payload,
-                signature: vec![],
-            })),
-            Some(Payload::PrePrepare(pre_prepare)) => Some(Payload::Prepare(Prepare {
-                payload: pre_prepare.payload,
-                signature: vec![],
-            })),
-            Some(Payload::Prepare(prepare)) => Some(Payload::Commit(Commit {
-                payload: prepare.payload,
-                signature: vec![],
-            })),
-            _ => None,
-        };
-
-        Message {
-            view: m.view,
-            seq: m.seq,
-            id: self.id as u64,
-            digest: String::new(),
-            payload: msg.clone(),
-        }
     }
 }

@@ -26,7 +26,7 @@ pub async fn broadcast(local: usize, list: HashMap<usize, String>, msg: Message)
                     debug!("send msg to addr {} success", addr);
                 }
                 Err(err) => {
-                    warn!("send msg to addr {} err: {}", addr, err.to_string());
+                    warn!("send msg to addr {} err: {}", addr, err);
                 }
             }
         }
