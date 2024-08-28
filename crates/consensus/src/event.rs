@@ -1,9 +1,9 @@
+use crate::members::Membership;
 use crate::message::message::Payload;
 use crate::message::{Commit, PrePrepare, Prepare};
 use crate::{client::broadcast, message::Message};
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::RwLock;
+use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 use tracing::{debug, info};
 
@@ -55,28 +55,26 @@ impl Event {
         }
     }
 
-    pub fn new_commited(seq: u64) -> Self {
-        let mut msg: Message = Default::default();
-        msg.seq = seq;
-        Self {
-            msg,
-            event_type: EventType::Commited,
-        }
-    }
+    // pub fn new_commited(seq: u64) -> Self {
+    //     let mut msg: Message = Default::default();
+    //     msg.seq = seq;
+    //     Self {
+    //         msg,
+    //         event_type: EventType::Commited,
+    //     }
+    // }
 }
 
-pub struct EventHandler {
-    id: usize,
-    id_list: HashMap<usize, String>,
+pub struct EventHandler<T: Membership> {
+    members: Arc<T>,
     commited_seq: AtomicUsize,
     receiver: Receiver<Event>,
 }
 
-impl EventHandler {
-    pub fn new(id: usize, id_list: HashMap<usize, String>, receiver: Receiver<Event>) -> Self {
+impl<T: Membership> EventHandler<T> {
+    pub fn new(members: Arc<T>, receiver: Receiver<Event>) -> Self {
         Self {
-            id,
-            id_list,
+            members,
             commited_seq: AtomicUsize::new(0),
             receiver,
         }
@@ -86,7 +84,7 @@ impl EventHandler {
         while let Some(event) = self.receiver.recv().await {
             match event.event_type {
                 EventType::Broadcast => {
-                    broadcast(self.id, self.id_list.clone(), event.msg).await;
+                    broadcast(self.members.local_id(), self.members.members(), event.msg).await;
                 }
                 EventType::Commit => {
                     if event.msg.seq == (self.commited_seq.load(Ordering::SeqCst) + 1) as u64 {

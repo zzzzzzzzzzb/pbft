@@ -1,3 +1,4 @@
+use crate::members::Members;
 use crate::{
     error::ConsensusError,
     event::EventHandler,
@@ -7,7 +8,7 @@ use crate::{
     },
     pool::RequestHandler,
 };
-use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::{mpsc, mpsc::Sender};
 use tonic::{transport::Server as TransportServer, Response};
 use tracing::{debug, error, info};
@@ -47,12 +48,7 @@ impl Pbft for Server {
     }
 }
 
-pub async fn run(
-    id: usize,
-    is_leader: bool,
-    id_list: HashMap<usize, String>,
-    address: String,
-) -> Result<(), ConsensusError> {
+pub async fn run(member: Arc<Members>, address: String) -> Result<(), ConsensusError> {
     let addr = address.parse()?;
 
     let (tx_req, rv_req) = mpsc::channel(1024); // request
@@ -61,10 +57,9 @@ pub async fn run(
 
     let server = Server { sender: tx_req };
 
-    let mut request_handler =
-        RequestHandler::new(id, is_leader, id_list.clone(), rv_req, 10, tx_event);
+    let mut request_handler = RequestHandler::new(member.clone(), rv_req, 10, tx_event);
 
-    let mut event_handler = EventHandler::new(id, id_list.clone(), rv_event);
+    let mut event_handler = EventHandler::new(member.clone(), rv_event);
 
     let task_req = tokio::spawn(async move {
         debug!("request handler starting...");

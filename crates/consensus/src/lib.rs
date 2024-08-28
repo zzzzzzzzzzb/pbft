@@ -1,6 +1,7 @@
 mod client;
 pub mod error;
 mod event;
+pub mod members;
 mod message;
 mod pool;
 pub mod server;
@@ -23,7 +24,7 @@ mod tests {
     async fn start_client() {
         let msg = Message {
             view: 1,
-            seq: 5,
+            seq: 3,
             id: 0,
             digest: "".to_string(),
             payload: Some(Payload::Request(Request {

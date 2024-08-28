@@ -1,4 +1,6 @@
 use config::config::read_toml;
+use consensus::members::Members;
+use std::sync::Arc;
 use std::{collections::HashMap, str::FromStr};
 use tracing_subscriber::fmt;
 
@@ -20,18 +22,13 @@ async fn main() {
         })
         .collect();
 
+    let membership = Arc::new(Members::new(conf.node.id, conf.node.is_leader, &id_list));
+
     let level = tracing::Level::from_str(&conf.log.level).unwrap();
 
     fmt().with_max_level(level).init();
 
-    if let Err(err) = consensus::server::run(
-        conf.node.id,
-        conf.node.is_leader,
-        id_list,
-        conf.server.listen_addr,
-    )
-    .await
-    {
+    if let Err(err) = consensus::server::run(membership.clone(), conf.server.listen_addr).await {
         panic!("{}", err)
     }
 }

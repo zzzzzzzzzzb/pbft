@@ -1,6 +1,6 @@
-use crate::event::{Event, EventType};
+use crate::event::Event;
+use crate::members::Membership;
 use crate::message::{message::Payload, Commit, Message, PrePrepare, Prepare};
-use std::cmp::PartialEq;
 use std::{
     collections::{hash_map, HashMap},
     sync::Arc,
@@ -17,11 +17,8 @@ struct SeqMessage {
     commit: HashMap<usize, Commit>,
 }
 
-pub struct Pool {
-    id: usize,
-    is_leader: bool,
-    id_list: HashMap<usize, String>,
-
+pub struct Pool<T: Membership> {
+    member: Arc<T>,
     view: usize,
     stable_checkpoint: usize,
 
@@ -32,16 +29,14 @@ pub struct Pool {
     event_sender: Sender<Event>,
 }
 
-pub struct RequestHandler {
-    message_pool: Arc<Mutex<Pool>>,
+pub struct RequestHandler<T: Membership> {
+    message_pool: Arc<Mutex<Pool<T>>>,
     receiver: Receiver<Message>,
 }
 
-impl RequestHandler {
+impl<T: Membership> RequestHandler<T> {
     pub fn new(
-        id: usize,
-        is_leader: bool,
-        id_list: HashMap<usize, String>,
+        member: Arc<T>,
         receiver: Receiver<Message>,
         capacity: usize,
         sender: Sender<Event>,
@@ -57,9 +52,7 @@ impl RequestHandler {
         Self {
             receiver,
             message_pool: Arc::new(Mutex::new(Pool {
-                id,
-                is_leader,
-                id_list,
+                member,
                 view: 1,
                 stable_checkpoint: 0,
                 capacity,
@@ -79,7 +72,7 @@ impl RequestHandler {
     }
 }
 
-impl Pool {
+impl<T: Membership> Pool<T> {
     async fn add(&mut self, m: Message) {
         let m_view = m.view as usize;
         let m_seq = m.seq as usize;
@@ -96,7 +89,7 @@ impl Pool {
                     "[REQUEST] received request. view:{}, sequence:{}",
                     m_view, m_seq
                 );
-                if self.is_leader {
+                if self.member.is_leader() {
                     info!(
                         "[REQUEST]is leader, broadcast pre-prepare message. view:{}, sequence:{}",
                         m_view, m_seq
@@ -109,8 +102,11 @@ impl Pool {
                         .pre_prepare
                         .insert(m.id as usize, pre_prepare);
 
-                    self.event(Event::new_broadcast(self.id as u64, m.clone()))
-                        .await;
+                    self.event(Event::new_broadcast(
+                        self.member.local_id() as u64,
+                        m.clone(),
+                    ))
+                    .await;
                 } else {
                     debug!("not leader, do nothing");
                 }
@@ -128,8 +124,11 @@ impl Pool {
                         "[PRE-PREPARE] view:{}, sequence:{} pre-prepared",
                         m_view, m_seq
                     );
-                    self.event(Event::new_broadcast(self.id as u64, m.clone()))
-                        .await;
+                    self.event(Event::new_broadcast(
+                        self.member.local_id() as u64,
+                        m.clone(),
+                    ))
+                    .await;
                 }
             }
             Some(Payload::Prepare(ref prepare)) => {
@@ -142,8 +141,11 @@ impl Pool {
                 }
                 if self.is_prepared(index) {
                     info!("[PREPARE] view:{}, sequence:{} prepared", m_view, m_seq);
-                    self.event(Event::new_broadcast(self.id as u64, m.clone()))
-                        .await;
+                    self.event(Event::new_broadcast(
+                        self.member.local_id() as u64,
+                        m.clone(),
+                    ))
+                    .await;
                 }
             }
             Some(Payload::Commit(ref commit)) => {
@@ -190,7 +192,7 @@ impl Pool {
     }
     fn bft_node_num(&self) -> usize {
         // 2f
-        (self.id_list.len() * 2) / 3
+        (self.member.members().len() * 2) / 3
     }
     fn index_in_queue(&self, seq: usize) -> usize {
         seq - self.stable_checkpoint + self.start
